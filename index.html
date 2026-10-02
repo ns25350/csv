@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="単語帳の写真から英文と日本語訳を抽出。Geminiで照合し、編集して8列のCSVに保存できる教員向けツール。">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>例文ノート — 写真から、教材へ。</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./style.css">
+  <script type="module" src="./js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><img src="./favicon.svg" alt="" width="32" height="32"><span>例文ノート<small>EXAMPLE NOTE</small></span></a>
+    <div class="top-actions"><span class="local-tag">写真 → Gemini → CSV</span><button id="settings-open" class="button light"><span id="connection-dot" class="dot"></span>API設定</button><button id="help-open" class="icon-button" aria-label="使い方">?</button></div>
+  </header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">教える準備を、少し軽く。</p><h1>写真から、<span>教材へ。</span></h1><p class="subhead">単語帳の例文と日本語訳を、一行ずつ。<br class="mobile-only">抽出・チェック・CSV保存をひとつの画面で。</p></div><div class="workflow"><span><b>01</b> 写真を追加</span><i>→</i><span><b>02</b> AIで照合</span><i>→</i><span><b>03</b> CSVを保存</span></div></section>
+    <section class="setup-grid">
+      <div class="card upload-card"><div class="section-label"><span>01 / SOURCE</span><span>JPG · PNG · WEBP</span></div>
+        <label id="drop-zone" class="drop-zone" for="photos-input" tabindex="0"><svg width="33" height="33" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="4" y="5" width="24" height="22" rx="4" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="m6 23 7-7 5 5 5-6 4 5" stroke="currentColor" stroke-width="1.5"/></svg><strong>写真をドロップ、または選択</strong><span>複数のページをまとめて追加できます</span></label>
+        <input id="photos-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        <div class="upload-foot"><span>選択しただけでは送信されません</span><button id="demo" class="text-button">サンプルで試す ↗</button></div>
+      </div>
+      <div class="card process-card"><div class="section-label"><span>02 / PROCESS</span><span id="config-status">API未設定</span></div><h2>原文を残して、確かめる。</h2><p>英文・訳の対応と番号を抽出。もう一度写真と照合し、気になる箇所に理由と修正候補を付けます。</p>
+        <label class="check-label"><input id="auto-review" type="checkbox" checked><span>抽出後にAIチェックを実行<small>通常は写真1枚につき抽出とチェックの2回呼び出し</small></span></label>
+        <div class="run-actions"><button id="run" class="button primary" disabled>抽出を開始 <span>→</span></button><button id="stop" class="button light" hidden>停止</button><span id="ready-count">写真を追加してください</span></div>
+      </div>
+    </section>
+    <section id="photo-section" class="photo-section" hidden><div class="row-heading"><h2>追加した写真 <span id="photo-count" class="count">0</span></h2><p>ページ番号は自動読取。必要なら写真ごとに指定できます。</p></div><div id="photo-list" class="photo-list"></div></section>
+    <div id="progress-section" class="progress-section" hidden><div><span id="progress-message" aria-live="polite"></span><span id="token-count"></span></div><progress id="progress" max="100" value="0"></progress></div>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <section class="results-card card">
+      <div class="results-heading"><div><p class="section-label">03 / REVIEW & EXPORT</p><h2>抽出した例文 <span id="row-count" class="count">0</span></h2></div><div class="export-actions"><button id="review" class="button light" disabled>AIで再チェック</button><button id="export" class="button primary" disabled>CSVを保存 ↓</button></div></div>
+      <div class="table-toolbar"><div class="filter-tabs" role="group" aria-label="状態で絞り込む"><button data-filter="all" class="filter active" aria-pressed="true">すべて <span id="all-count">0</span></button><button data-filter="review" class="filter" aria-pressed="false">要確認 <span id="review-count">0</span></button><button data-filter="confirmed" class="filter" aria-pressed="false">確認済み <span id="confirmed-count">0</span></button></div><input id="search" type="search" placeholder="英文・日本語訳を検索" aria-label="英文・日本語訳を検索"></div>
+      <div class="review-layout"><div class="table-area"><div class="table-scroll"><table><thead><tr><th class="index-cell">#</th><th>英文 / 日本語訳</th><th>ページ・番号</th><th>状態</th></tr></thead><tbody id="rows"></tbody></table></div><div id="empty" class="empty-state"><span class="empty-icon">Aa</span><h3>例文が、ここに並びます。</h3><p>写真を追加して抽出を始めてください。<br>まずはサンプルで、チェックと編集の流れを試せます。</p></div><div class="table-pagination" id="pagination" hidden><span id="page-info"></span><div><button id="previous" class="icon-button" aria-label="前の50件">←</button><button id="next" class="icon-button" aria-label="次の50件">→</button></div></div></div>
+        <aside id="inspector" class="inspector"><div class="inspector-empty"><span class="section-label">LINE INSPECTOR</span><h3>一行ずつ、丁寧に。</h3><p>例文を選ぶと、原文と修正候補を確認・編集できます。</p><div class="status-key"><span class="badge ai">AI確認済み</span><p>AIが問題を検出しなかった行</p><span class="badge warn">要確認</span><p>疑問点や編集後の確認が必要な行</p><span class="badge manual">手動確認済み</span><p>利用者が確認した行</p></div></div></aside>
+      </div>
+      <div class="results-foot"><div><button id="add-row" class="text-button" disabled>＋ 行を追加</button><button id="save-session" class="text-button" disabled>作業JSONを保存</button><button id="load-session" class="text-button">作業JSONを読み込む</button><input id="session-input" type="file" accept="application/json,.json" hidden></div><button id="clear" class="text-button danger" disabled>結果をクリア</button></div>
+    </section>
+    <footer><span>例文ノート <span class="footer-dot">·</span> 先生のための、小さな転記ツール。</span><span>AIのチェック結果も、最後は原文と照合を。</span></footer>
+  </main>
+  <dialog id="settings-dialog"><form id="settings-form"><div class="dialog-heading"><div><p class="eyebrow">CONNECTION</p><h2>Geminiに接続</h2></div><button type="button" data-close="settings-dialog" class="icon-button" aria-label="閉じる">×</button></div>
+    <p class="dialog-intro">ご自身のGoogle CloudプロジェクトとAPIキーを使います。キーはこのタブのメモリだけに保持されます。</p>
+    <label class="field">Google Cloud プロジェクトID<input id="project-id" placeholder="my-teaching-project" autocomplete="off" required></label>
+    <label class="field">接続方式<select id="provider"><option value="vertex">Vertex AI / Google Cloud APIキー</option><option value="gemini">Gemini API / Google AI Studioキー</option></select></label>
+    <p id="provider-help" class="field-hint"></p>
+    <label class="field">APIキー<div class="input-with-button"><input id="api-key" type="password" placeholder="APIキーを入力" autocomplete="off" spellcheck="false" required><button id="show-key" type="button" class="text-button" aria-label="APIキーを表示">表示</button></div></label>
+    <div class="field-grid"><label class="field">抽出モデル<input id="extract-model" value="gemini-2.5-flash" list="models" required></label><label class="field">チェックモデル<input id="review-model" value="gemini-2.5-pro" list="models" required></label></div><datalist id="models"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"></datalist>
+    <label class="check-label"><input id="protect-csv" type="checkbox" checked><span>CSVの数式として解釈される文字を保護<small>= / + / - / @ で始まるセルに ' を付けます</small></span></label>
+    <div class="settings-note"><strong>接続と保存について</strong><p>写真と例文は処理時にGoogleへ送信され、API利用料が発生する場合があります。キー・写真・結果は自動保存しません。タブを閉じる前にCSVまたは作業JSONを保存してください。</p><p>APIキー方式では、利用先のプロジェクトはキーに紐付いたものです。入力したIDとの一致は自動検証できません。Gemini 2.5の利用可否はプロジェクトによって異なります。</p></div>
+    <p id="settings-error" class="error-text" role="alert" hidden></p><div class="dialog-buttons"><button id="test-connection" type="button" class="button light">接続をテスト</button><button type="submit" class="button primary">設定を適用</button></div>
+  </form></dialog>
+  <dialog id="photo-dialog" class="image-dialog"><div class="dialog-heading"><div><p class="eyebrow">SOURCE PHOTO</p><h2 id="viewer-name">元写真</h2></div><button type="button" data-close="photo-dialog" class="icon-button" aria-label="閉じる">×</button></div><div class="viewer-controls"><label>拡大率 <input id="zoom" type="range" min="50" max="300" value="100"><output id="zoom-value">100%</output></label><button id="rotate" class="button light">右に90°回転</button></div><div id="image-viewport" class="image-viewport"><img id="viewer-image" alt="文字起こし元の写真"></div><p class="field-hint">回転は抽出前のみ変更できます。横方向・縦方向にスクロールして確認できます。</p></dialog>
+  <dialog id="help-dialog"><div class="dialog-heading"><h2>使い方</h2><button type="button" data-close="help-dialog" class="icon-button" aria-label="閉じる">×</button></div><ol class="help-steps"><li><strong>API設定</strong><p>Google CloudプロジェクトIDと、選択した接続方式に対応するAPIキーを入力します。Vertex AIはサービスアカウントに紐付いたキーを使います。通常の制限なしキーだけで動くとは限りません。</p></li><li><strong>写真を追加・抽出</strong><p>英文と訳が読める写真を選びます。①②は例文番号、区切られたまとまりはブロック番号になります。短い語句も抽出します。</p></li><li><strong>AIの疑問点を確認</strong><p>「要確認」の行を選び、元写真を拡大して確認します。候補の適用や手動編集をしたあと「手動確認済みにする」を押します。</p></li><li><strong>8列のCSVを保存</strong><p>英文 / 日本語訳 / 写真名 / ページ番号 / ブロック番号 / 例文番号 / 状態 / 確認理由。全行を保存します。空欄の例文番号は空欄のままです。</p></li></ol><p class="field-hint">作業JSONは写真・APIキーを含みません。再開後は必要に応じて同じ名前の写真を追加すると照合できます。CSVはExcel向けのUTF-8 BOM付きです。</p><p class="field-hint"><a href="https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys?usertype=standard" target="_blank" rel="noopener noreferrer">Google Cloud APIキーの公式説明 ↗</a> · <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noopener noreferrer">Gemini APIキーの公式説明 ↗</a></p></dialog>
+</body></html>
